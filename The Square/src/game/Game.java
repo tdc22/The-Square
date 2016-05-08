@@ -57,6 +57,7 @@ public class Game extends StandardGame {
 	final Vector3f vecRight = new Vector3f(0, 0, -1);
 	final Vector2f vecX = new Vector2f(1, 0);
 	Quad intersectionInterface;
+	Shader cutshader;
 
 	final Vector2f SCREEN_MIN = new Vector2f(-6, -5);
 	final Vector2f SCREEN_MAX = new Vector2f(6, 5);
@@ -87,7 +88,9 @@ public class Game extends StandardGame {
 						DefaultValues.DEFAULT_VIDEO_ZFAR, false),
 				new NullSoundEnvironment());
 		layer3d.setProjectionMatrix(ProjectionHelper.ortho(SCREEN_MAX.x,
-				SCREEN_MIN.x, SCREEN_MIN.y, SCREEN_MAX.y, -1, 1));
+				SCREEN_MIN.x, SCREEN_MIN.y, SCREEN_MAX.y, -10, 10));
+		// layer3d.setProjectionMatrix(ProjectionHelper.perspective(90, 3/4f,
+		// 0.1f, 100f));
 		display.bindMouse();
 		cam.setFlyCam(false);
 		cam.translateTo(0f, 0f, 0);
@@ -102,6 +105,10 @@ public class Game extends StandardGame {
 						"res/shaders/defaultshader.vert",
 						"res/shaders/defaultshader.frag"));
 		addShaderInterface(defaultshaderInterface);
+		cutshader = new Shader(ShaderLoader.loadShaderFromFile(
+				"res/shaders/cutshader.vert", "res/shaders/cutshader.frag"));
+		addShader(cutshader);
+		cutshader.addArgument("cameraNormal", cam.getDirection());
 
 		Input inputKeyW = new Input(Input.KEYBOARD_EVENT, "W",
 				KeyInput.KEY_DOWN);
@@ -153,7 +160,7 @@ public class Game extends StandardGame {
 		playerbody.setAngularFactor(new Vector3f(0, 0, 0));
 		playerbody.setRestitution(0);
 		space.addRigidBody(player, playerbody);
-		defaultshader.addObject(player);
+		cutshader.addObject(player);
 
 		playerJumpChecker = new GhostObject3(
 				new CylinderShape(0, 0, 0, PLAYER_SIZE.x
@@ -167,12 +174,12 @@ public class Game extends StandardGame {
 		Box box = new Box(4, -4, 4, 1, 0.3f, 1);
 		RigidBody3 rb1 = new RigidBody3(PhysicsShapeCreator.create(box));
 		space.addRigidBody(box, rb1);
-		defaultshader.addObject(box);
+		cutshader.addObject(box);
 
 		onGround = false;
 
-		defaultshader.addObject(new Sphere(0, 2, 0, 1, 36, 36));
-		defaultshader.addObject(new Box(0, 4, 0, 1, 1, 1));
+		cutshader.addObject(new Sphere(0, 2, 0, 1, 36, 36));
+		cutshader.addObject(new Box(0, 4, 0, 1, 1, 1));
 
 		defaultshaderInterface.addObject(new Circle(55, 55, 50, 36));
 		intersectionInterface = new Quad(55, 55, 55, 1);
@@ -275,13 +282,10 @@ public class Game extends StandardGame {
 		pos = new Vector2f(player.getTranslation().x, player.getTranslation().z);
 		float distToCenterSquared = (float) pos.lengthSquared();
 		if (distToCenterSquared > PLAYER_MAX_DIST_TO_CENTER_SQUARED) {
-			System.out.println(distToCenterSquared);
 			pos.setLength(PLAYER_MAX_DIST_TO_CENTER);
-			System.out.println(distToCenterSquared);
 			player.getTranslation().x = pos.x;
 			player.getTranslation().z = pos.y;
 		}
-		System.out.println(playerbody.getTranslation().y);
 		if (player.getTranslation().y > PLAYER_MAX_Y) {
 			player.getTranslation().y = PLAYER_MAX_Y;
 			playerbody.getLinearVelocity().y = 0;
@@ -310,5 +314,6 @@ public class Game extends StandardGame {
 
 		player.updateBuffer();
 		cam.updateBuffer();
+		cutshader.setArgument("cameraNormal", cam.getDirection());
 	}
 }
