@@ -23,5 +23,5 @@ void main(void) {
 		pass_Valid = (dot(pass_Position.xyz, cameraNormal) < 0) ? 1 : 0;
 	}
 	if(front) out_Color.g = 0;
-	//if(pass_Valid == 0) out_Color.a = 0;
+	if(pass_Valid == 0) out_Color.a = 0;
 }

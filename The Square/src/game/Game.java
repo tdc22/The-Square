@@ -171,10 +171,21 @@ public class Game extends StandardGame {
 		playerJumpChecker.setRestitution(0);
 		space.addGhostObject(playerJumpChecker);
 
-		Box box = new Box(4, -4, 4, 1, 0.3f, 1);
-		RigidBody3 rb1 = new RigidBody3(PhysicsShapeCreator.create(box));
-		space.addRigidBody(box, rb1);
-		cutshader.addObject(box);
+		Box box1 = new Box(4, -4, 4, 1, 0.3f, 1);
+		RigidBody3 rb1 = new RigidBody3(PhysicsShapeCreator.create(box1));
+		space.addRigidBody(box1, rb1);
+		cutshader.addObject(box1);
+		
+		Box box2 = new Box(4, 0, 4, 1, 1f, 1);
+		RigidBody3 rb2 = new RigidBody3(PhysicsShapeCreator.create(box2));
+		space.addRigidBody(box2, rb2);
+		cutshader.addObject(box2);
+		
+		Box box3 = new Box(4, 4, 4, 1, 1f, 1);
+		box3.rotate(45, 45, 0);
+		RigidBody3 rb3 = new RigidBody3(PhysicsShapeCreator.create(box3));
+		space.addRigidBody(box3, rb3);
+		cutshader.addObject(box3);
 
 		onGround = false;
 
