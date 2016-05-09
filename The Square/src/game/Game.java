@@ -100,15 +100,15 @@ public class Game extends StandardGame {
 				"res/shaders/defaultshader.vert",
 				"res/shaders/defaultshader.frag"));
 		addShader(defaultshader);
+		cutshader = new Shader(ShaderLoader.loadShaderFromFile(
+				"res/shaders/cutshader.vert", "res/shaders/cutshader.frag"));
+		cutshader.addArgument("cameraNormal", cam.getDirection());
+		addShader(cutshader);
 		Shader defaultshaderInterface = new Shader(
 				ShaderLoader.loadShaderFromFile(
 						"res/shaders/defaultshader.vert",
 						"res/shaders/defaultshader.frag"));
 		addShaderInterface(defaultshaderInterface);
-		cutshader = new Shader(ShaderLoader.loadShaderFromFile(
-				"res/shaders/cutshader.vert", "res/shaders/cutshader.frag"));
-		addShader(cutshader);
-		cutshader.addArgument("cameraNormal", cam.getDirection());
 
 		Input inputKeyW = new Input(Input.KEYBOARD_EVENT, "W",
 				KeyInput.KEY_DOWN);
@@ -256,7 +256,8 @@ public class Game extends StandardGame {
 				predictedPos.scale(distToMid);
 				move.x = predictedPos.x - pos.x;
 				move.z = predictedPos.y - pos.y;
-				move.setLength(movespeed);
+				if(move.lengthSquared() > 0)
+					move.setLength(movespeed);
 			}
 		}
 
