@@ -109,6 +109,8 @@ public class Game extends StandardGame {
 						"res/shaders/defaultshader.vert",
 						"res/shaders/defaultshader.frag"));
 		addShaderInterface(defaultshaderInterface);
+		
+		setDepthTestEnabled(false);
 
 		Input inputKeyW = new Input(Input.KEYBOARD_EVENT, "W",
 				KeyInput.KEY_DOWN);
