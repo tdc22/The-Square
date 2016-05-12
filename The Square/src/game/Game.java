@@ -1,5 +1,15 @@
 package game;
 
+import java.awt.Color;
+import java.util.ArrayList;
+import java.util.List;
+
+import broadphase.SAP;
+import collisionshape.CylinderShape;
+import display.DisplayMode;
+import display.GLDisplay;
+import display.PixelFormat;
+import display.VideoSettings;
 import gui.Font;
 import input.Input;
 import input.InputEvent;
@@ -13,11 +23,12 @@ import narrowphase.EPA;
 import narrowphase.GJK;
 import objects.GhostObject3;
 import objects.RigidBody3;
+import objects.ShapedObject3;
 import physics.PhysicsDebug;
 import physics.PhysicsShapeCreator;
 import physics.PhysicsSpace;
 import positionalcorrection.ProjectionCorrection;
-import resolution.ImpulseResolution;
+import resolution.SimpleLinearImpulseResolution;
 import shader.Shader;
 import shape.Box;
 import shape.Cylinder;
@@ -35,12 +46,7 @@ import utils.ProjectionHelper;
 import utils.SimpleGameProfiler;
 import vector.Vector2f;
 import vector.Vector3f;
-import broadphase.SAP;
-import collisionshape.CylinderShape;
-import display.DisplayMode;
-import display.GLDisplay;
-import display.PixelFormat;
-import display.VideoSettings;
+import vector.Vector4f;
 
 public class Game extends StandardGame {
 	Debugger debugger;
@@ -59,36 +65,40 @@ public class Game extends StandardGame {
 	Quad intersectionInterface;
 	Shader cutshader;
 
+	Sphere goal;
+	RigidBody3 goalbody;
+
 	final Vector2f SCREEN_MIN = new Vector2f(-6, -5);
 	final Vector2f SCREEN_MAX = new Vector2f(6, 5);
 
 	final Vector2f PLAYER_SIZE = new Vector2f(0.5f, 0.5f);
 	final float PLAYER_MOVE_SPEED_X = 4f;
-	final float PLAYER_MOVE_SPEED_Z = 4f;
+	final float PLAYER_MOVE_SPEED_Z = 1.5f;
 	final float PLAYER_CHECKER_SIZE = 0.1f;
 	final float PLAYER_CHECKER_OFFSET = PLAYER_CHECKER_SIZE + 0.1f;
-	final float PLAYER_CHECKER_SIDE_OFFSET = 0.02f;
+	final float PLAYER_CHECKER_SIDE_OFFSET = 0.05f;
 	final float PLAYER_JUMP_STRENGTH = 6f;
-	final float PLAYER_MAX_Y = SCREEN_MAX.y - PLAYER_SIZE.y;
+	final float PLAYER_MAX_Y = SCREEN_MAX.y - PLAYER_SIZE.y + 0.5f;
 	final float PLAYER_MAX_DIST_TO_CENTER = SCREEN_MAX.x - PLAYER_SIZE.x;
-	final float PLAYER_MAX_DIST_TO_CENTER_SQUARED = PLAYER_MAX_DIST_TO_CENTER
-			* PLAYER_MAX_DIST_TO_CENTER;
+	final float PLAYER_MAX_DIST_TO_CENTER_SQUARED = PLAYER_MAX_DIST_TO_CENTER * PLAYER_MAX_DIST_TO_CENTER;
 
 	int millisSinceLastJump = 0;
-	final int MILLIS_BETWEEN_JUMPS = 100;
+	final int MILLIS_BETWEEN_JUMPS = 200;
+	int level = 1;
+	List<ShapedObject3> levelObjects;
+	List<RigidBody3> levelObjectBodies;
 
 	@Override
 	public void init() {
 		useFBO = false;
+		depthTestEnabled = false;
 		initDisplay(new GLDisplay(), new DisplayMode(), new PixelFormat(),
-				new VideoSettings(DefaultValues.DEFAULT_VIDEO_RESOLUTION_X,
-						DefaultValues.DEFAULT_VIDEO_RESOLUTION_Y,
-						DefaultValues.DEFAULT_VIDEO_FOVY,
-						DefaultValues.DEFAULT_VIDEO_ZNEAR,
+				new VideoSettings(DefaultValues.DEFAULT_VIDEO_RESOLUTION_X, DefaultValues.DEFAULT_VIDEO_RESOLUTION_Y,
+						DefaultValues.DEFAULT_VIDEO_FOVY, DefaultValues.DEFAULT_VIDEO_ZNEAR,
 						DefaultValues.DEFAULT_VIDEO_ZFAR, false),
 				new NullSoundEnvironment());
-		layer3d.setProjectionMatrix(ProjectionHelper.ortho(SCREEN_MAX.x,
-				SCREEN_MIN.x, SCREEN_MIN.y, SCREEN_MAX.y, -10, 10));
+		layer3d.setProjectionMatrix(
+				ProjectionHelper.ortho(SCREEN_MAX.x, SCREEN_MIN.x, SCREEN_MIN.y, SCREEN_MAX.y, -10, 10));
 		// layer3d.setProjectionMatrix(ProjectionHelper.perspective(90, 3/4f,
 		// 0.1f, 100f));
 		display.bindMouse();
@@ -96,40 +106,34 @@ public class Game extends StandardGame {
 		cam.translateTo(0f, 0f, 0);
 		cam.rotateTo(0, 0);
 
-		Shader defaultshader = new Shader(ShaderLoader.loadShaderFromFile(
-				"res/shaders/defaultshader.vert",
-				"res/shaders/defaultshader.frag"));
+		setRendered(true, false, true);
+
+		Shader defaultshader = new Shader(
+				ShaderLoader.loadShaderFromFile("res/shaders/defaultshader.vert", "res/shaders/defaultshader.frag"));
 		addShader(defaultshader);
-		cutshader = new Shader(ShaderLoader.loadShaderFromFile(
-				"res/shaders/cutshader.vert", "res/shaders/cutshader.frag"));
+		cutshader = new Shader(
+				ShaderLoader.loadShaderFromFile("res/shaders/cutshader.vert", "res/shaders/cutshader.frag"));
 		cutshader.addArgument("cameraNormal", cam.getDirection());
 		addShader(cutshader);
 		Shader defaultshaderInterface = new Shader(
-				ShaderLoader.loadShaderFromFile(
-						"res/shaders/defaultshader.vert",
-						"res/shaders/defaultshader.frag"));
+				ShaderLoader.loadShaderFromFile("res/shaders/defaultshader.vert", "res/shaders/defaultshader.frag"));
 		addShaderInterface(defaultshaderInterface);
-		
-		setDepthTestEnabled(false);
 
-		Input inputKeyW = new Input(Input.KEYBOARD_EVENT, "W",
-				KeyInput.KEY_DOWN);
-		Input inputKeyA = new Input(Input.KEYBOARD_EVENT, "A",
-				KeyInput.KEY_DOWN);
-		Input inputKeyS = new Input(Input.KEYBOARD_EVENT, "S",
-				KeyInput.KEY_DOWN);
-		Input inputKeyD = new Input(Input.KEYBOARD_EVENT, "D",
-				KeyInput.KEY_DOWN);
-		Input inputKeySpace = new Input(Input.KEYBOARD_EVENT, "Space",
-				KeyInput.KEY_DOWN);
-		Input inputKeyUp = new Input(Input.KEYBOARD_EVENT, "Up",
-				KeyInput.KEY_DOWN);
-		Input inputKeyLeft = new Input(Input.KEYBOARD_EVENT, "Left",
-				KeyInput.KEY_DOWN);
-		Input inputKeyDown = new Input(Input.KEYBOARD_EVENT, "Down",
-				KeyInput.KEY_DOWN);
-		Input inputKeyRight = new Input(Input.KEYBOARD_EVENT, "Right",
-				KeyInput.KEY_DOWN);
+		Shader interfaceOverlay = new Shader(
+				ShaderLoader.loadShaderFromFile("res/shaders/colorshader.vert", "res/shaders/colorshader.frag"));
+		interfaceOverlay.addArgumentName("u_color");
+		interfaceOverlay.addArgument(new Vector4f(1f, 1f, 1f, 0.5f));
+		addShaderInterface(interfaceOverlay);
+
+		Input inputKeyW = new Input(Input.KEYBOARD_EVENT, "W", KeyInput.KEY_DOWN);
+		Input inputKeyA = new Input(Input.KEYBOARD_EVENT, "A", KeyInput.KEY_DOWN);
+		Input inputKeyS = new Input(Input.KEYBOARD_EVENT, "S", KeyInput.KEY_DOWN);
+		Input inputKeyD = new Input(Input.KEYBOARD_EVENT, "D", KeyInput.KEY_DOWN);
+		Input inputKeySpace = new Input(Input.KEYBOARD_EVENT, "Space", KeyInput.KEY_DOWN);
+		Input inputKeyUp = new Input(Input.KEYBOARD_EVENT, "Up", KeyInput.KEY_DOWN);
+		Input inputKeyLeft = new Input(Input.KEYBOARD_EVENT, "Left", KeyInput.KEY_DOWN);
+		Input inputKeyDown = new Input(Input.KEYBOARD_EVENT, "Down", KeyInput.KEY_DOWN);
+		Input inputKeyRight = new Input(Input.KEYBOARD_EVENT, "Right", KeyInput.KEY_DOWN);
 		up = new InputEvent("Up", inputKeyW, inputKeyUp);
 		down = new InputEvent("Down", inputKeyS, inputKeyDown);
 		left = new InputEvent("Left", inputKeyA, inputKeyLeft);
@@ -141,14 +145,13 @@ public class Game extends StandardGame {
 		inputs.addEvent(right);
 		inputs.addEvent(jump);
 
-		space = new PhysicsSpace(new VerletIntegration(), new SAP(), new GJK(
-				new EPA()), new ImpulseResolution(), new ProjectionCorrection(
-				0.01f), new SimpleManifoldManager<Vector3f>());
+		space = new PhysicsSpace(new VerletIntegration(), new SAP(), new GJK(new EPA()),
+				new SimpleLinearImpulseResolution(), new ProjectionCorrection(0.01f),
+				new SimpleManifoldManager<Vector3f>());
 		space.setGlobalGravitation(new Vector3f(0, -8f, 0));
 
 		Font font = FontLoader.loadFont("res/fonts/DejaVuSans.ttf");
-		debugger = new Debugger(inputs, defaultshader, defaultshaderInterface,
-				font, cam);
+		debugger = new Debugger(inputs, defaultshader, defaultshaderInterface, font, cam);
 		physicsdebug = new PhysicsDebug(inputs, font, space);
 		GameProfiler gp = new SimpleGameProfiler();
 		setProfiler(gp);
@@ -157,44 +160,55 @@ public class Game extends StandardGame {
 		profiler = new Profiler(this, inputs, font, gp, pp);
 
 		player = new Cylinder(0, 0, 0, PLAYER_SIZE.x, PLAYER_SIZE.y, 36);
+		player.setColor(Color.red);
 		playerbody = new RigidBody3(PhysicsShapeCreator.create(player));
 		playerbody.setMass(1f);
+		playerbody.setLinearFactor(new Vector3f(1, 1, 1));
 		playerbody.setAngularFactor(new Vector3f(0, 0, 0));
 		playerbody.setRestitution(0);
+		playerbody.setStaticFriction(0f);
+		playerbody.setDynamicFriction(0f);
 		space.addRigidBody(player, playerbody);
 		cutshader.addObject(player);
 
 		playerJumpChecker = new GhostObject3(
-				new CylinderShape(0, 0, 0, PLAYER_SIZE.x
-						- PLAYER_CHECKER_SIDE_OFFSET, PLAYER_CHECKER_SIZE));
+				new CylinderShape(0, 0, 0, PLAYER_SIZE.x - PLAYER_CHECKER_SIDE_OFFSET, PLAYER_CHECKER_SIZE));
 		playerJumpChecker.setMass(1f);
 		playerJumpChecker.setLinearFactor(new Vector3f(0, 0, 0));
 		playerJumpChecker.setAngularFactor(new Vector3f(0, 0, 0));
 		playerJumpChecker.setRestitution(0);
 		space.addGhostObject(playerJumpChecker);
 
-		Box box1 = new Box(4, -4, 4, 1, 0.3f, 1);
-		RigidBody3 rb1 = new RigidBody3(PhysicsShapeCreator.create(box1));
-		space.addRigidBody(box1, rb1);
-		cutshader.addObject(box1);
-		
-		Box box2 = new Box(4, 0, 4, 1, 1f, 1);
-		RigidBody3 rb2 = new RigidBody3(PhysicsShapeCreator.create(box2));
-		space.addRigidBody(box2, rb2);
-		cutshader.addObject(box2);
-		
-		Box box3 = new Box(4, 4, 4, 1, 1f, 1);
-		box3.rotate(45, 45, 0);
-		RigidBody3 rb3 = new RigidBody3(PhysicsShapeCreator.create(box3));
-		space.addRigidBody(box3, rb3);
-		cutshader.addObject(box3);
+		goal = new Sphere(0, 2, 0, 0.5f, 36, 36);
+		goal.setColor(Color.blue);
+		goalbody = new RigidBody3(PhysicsShapeCreator.create(goal));
+		space.addRigidBody(goal, goalbody);
+		cutshader.addObject(goal);
+
+		levelObjects = new ArrayList<ShapedObject3>();
+		levelObjectBodies = new ArrayList<RigidBody3>();
+		loadLevel(1);
+
+		/*
+		 * Box box1 = new Box(4, -4, 4, 1, 0.3f, 1); RigidBody3 rb1 = new
+		 * RigidBody3(PhysicsShapeCreator.create(box1));
+		 * space.addRigidBody(box1, rb1); cutshader.addObject(box1);
+		 * 
+		 * Box box2 = new Box(4, 0, 4, 1, 1f, 1); RigidBody3 rb2 = new
+		 * RigidBody3(PhysicsShapeCreator.create(box2));
+		 * space.addRigidBody(box2, rb2); cutshader.addObject(box2);
+		 * 
+		 * Box box3 = new Box(4, 4, 4, 1, 1f, 1); box3.rotate(45, 45, 0);
+		 * RigidBody3 rb3 = new RigidBody3(PhysicsShapeCreator.create(box3));
+		 * space.addRigidBody(box3, rb3); cutshader.addObject(box3);
+		 */
 
 		onGround = false;
 
-		cutshader.addObject(new Sphere(0, 2, 0, 1, 36, 36));
-		cutshader.addObject(new Box(0, 4, 0, 1, 1, 1));
+		// cutshader.addObject(new Sphere(0, 2, 0, 1, 36, 36));
+		// cutshader.addObject(new Box(0, 4, 0, 1, 1, 1));
 
-		defaultshaderInterface.addObject(new Circle(55, 55, 50, 36));
+		interfaceOverlay.addObject(new Circle(55, 55, 50, 36));
 		intersectionInterface = new Quad(55, 55, 55, 1);
 		defaultshaderInterface.addObject(intersectionInterface);
 	}
@@ -236,8 +250,7 @@ public class Game extends StandardGame {
 		Vector3f frontVec = VecMath.transformVector(cam.getMatrix(), vecRight);
 		Vector3f rightVec = VecMath.crossproduct(frontVec, vecUp);
 		Vector3f move = new Vector3f();
-		Vector2f pos = new Vector2f(playerbody.getTranslation().x,
-				playerbody.getTranslation().z);
+		Vector2f pos = new Vector2f(playerbody.getTranslation().x, playerbody.getTranslation().z);
 		boolean isPlayerNotInCenter = pos.lengthSquared() > 0.01f;
 
 		if (isPlayerNotInCenter) {
@@ -252,13 +265,13 @@ public class Game extends StandardGame {
 			}
 			if (up.isActive() || down.isActive()) {
 				float movespeed = (float) new Vector2f(move.x, move.z).length();
-				Vector2f predictedPos = VecMath.addition(pos, new Vector2f(
-						move.x * delta / 1000f, move.z * delta / 1000f));
+				Vector2f predictedPos = VecMath.addition(pos,
+						new Vector2f(move.x * delta / 1000f, move.z * delta / 1000f));
 				predictedPos.normalize();
 				predictedPos.scale(distToMid);
 				move.x = predictedPos.x - pos.x;
 				move.z = predictedPos.y - pos.y;
-				if(move.lengthSquared() > 0)
+				if (move.lengthSquared() > 0)
 					move.setLength(movespeed);
 			}
 		}
@@ -274,19 +287,15 @@ public class Game extends StandardGame {
 		if (millisSinceLastJump < MILLIS_BETWEEN_JUMPS) {
 			millisSinceLastJump += delta;
 		}
-		if (jump.isActive() && onGround
-				&& millisSinceLastJump >= MILLIS_BETWEEN_JUMPS) {
+		if (jump.isActive() && onGround && millisSinceLastJump >= MILLIS_BETWEEN_JUMPS) {
 			move.y += PLAYER_JUMP_STRENGTH;
 			millisSinceLastJump = 0;
 		}
 
-		playerbody.setLinearVelocity(new Vector3f(move.x, playerbody
-				.getLinearVelocity().y + move.y, move.z));
+		playerbody.setLinearVelocity(new Vector3f(move.x, playerbody.getLinearVelocity().y + move.y, move.z));
 
-		playerJumpChecker.setTranslation(new Vector3f(playerbody
-				.getTranslation().x, playerbody.getTranslation().y
-				- PLAYER_SIZE.y - PLAYER_CHECKER_OFFSET, playerbody
-				.getTranslation().z));
+		playerJumpChecker.setTranslation(new Vector3f(playerbody.getTranslation().x,
+				playerbody.getTranslation().y - PLAYER_SIZE.y - PLAYER_CHECKER_OFFSET, playerbody.getTranslation().z));
 
 		space.update(delta);
 
@@ -329,5 +338,89 @@ public class Game extends StandardGame {
 		player.updateBuffer();
 		cam.updateBuffer();
 		cutshader.setArgument("cameraNormal", cam.getDirection());
+
+		if (space.hasCollision(playerbody, goalbody)) {
+			loadLevel(level + 1);
+		}
+	}
+
+	public void loadLevel(int level) {
+		this.level = level;
+
+		// clear previous level
+		for (int i = 0; i < levelObjects.size(); i++) {
+			ShapedObject3 so = levelObjects.get(i);
+			RigidBody3 rb = levelObjectBodies.get(i);
+			cutshader.removeObject(so);
+			space.removeRigidBody(so, rb);
+			so.delete();
+		}
+		levelObjects.clear();
+		levelObjectBodies.clear();
+		cam.rotateTo(0, 0);
+
+		switch (level) {
+		case 1:
+			player.translateTo(5, -5f, 0);
+			goal.translateTo(-5, -5f, 0);
+			break;
+		case 2:
+			player.translateTo(5, -5f, 0);
+			goal.translateTo(-5, -5f, 0);
+
+			Box box1 = new Box(0, -5f, 0, 0.5f, 0.5f, 0.5f);
+			RigidBody3 rb1 = new RigidBody3(PhysicsShapeCreator.create(box1));
+			space.addRigidBody(box1, rb1);
+			cutshader.addObject(box1);
+			levelObjects.add(box1);
+			levelObjectBodies.add(rb1);
+			break;
+		case 3:
+			player.translateTo(5, -5f, 0);
+			goal.translateTo(-5, -5f, 0);
+
+			Cylinder c1 = new Cylinder(0, 0, 0, 4, 6, 36);
+			RigidBody3 rb2 = new RigidBody3(PhysicsShapeCreator.create(c1));
+			space.addRigidBody(c1, rb2);
+			cutshader.addObject(c1);
+			levelObjects.add(c1);
+			levelObjectBodies.add(rb2);
+			break;
+		case 4:
+			player.translateTo(5, -5f, 0);
+			goal.translateTo(-5, -5f, 0);
+
+			Box box2 = new Box(2.5f, 0, 2.5f, 0.5f, 6f, 3f);
+			RigidBody3 rb3 = new RigidBody3(PhysicsShapeCreator.create(box2));
+			space.addRigidBody(box2, rb3);
+			cutshader.addObject(box2);
+			levelObjects.add(box2);
+			levelObjectBodies.add(rb3);
+
+			Box box3 = new Box(-2.5f, 0, -2.5f, 0.5f, 6f, 3f);
+			RigidBody3 rb4 = new RigidBody3(PhysicsShapeCreator.create(box3));
+			space.addRigidBody(box3, rb4);
+			cutshader.addObject(box3);
+			levelObjects.add(box3);
+			levelObjectBodies.add(rb4);
+			break;
+		case 5:
+			player.translateTo(5, -5f, 0);
+			goal.translateTo(-5, -5f, 0);
+			break;
+		case 6:
+			player.translateTo(5, -5f, 0);
+			goal.translateTo(-5, -5f, 0);
+			break;
+		case 7:
+			player.translateTo(5, -5f, 0);
+			goal.translateTo(-5, -5f, 0);
+			break;
+		case 8:
+			player.translateTo(5, -5f, 0);
+			goal.translateTo(-5, -5f, 0);
+			break;
+		}
+		System.out.println("Loaded level: " + level);
 	}
 }
