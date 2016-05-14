@@ -11,6 +11,7 @@ import display.GLDisplay;
 import display.PixelFormat;
 import display.VideoSettings;
 import gui.Font;
+import gui.Text;
 import input.Input;
 import input.InputEvent;
 import input.KeyInput;
@@ -63,7 +64,8 @@ public class Game extends StandardGame {
 	final Vector3f vecRight = new Vector3f(0, 0, -1);
 	final Vector2f vecX = new Vector2f(1, 0);
 	Quad intersectionInterface;
-	Shader cutshader;
+	Font font;
+	Shader cutshader, defaultshaderInterface;
 
 	Sphere goal;
 	RigidBody3 goalbody;
@@ -74,19 +76,20 @@ public class Game extends StandardGame {
 	final Vector2f PLAYER_SIZE = new Vector2f(0.5f, 0.5f);
 	final float PLAYER_MOVE_SPEED_X = 4f;
 	final float PLAYER_MOVE_SPEED_Z = 1.5f;
-	final float PLAYER_CHECKER_SIZE = 0.1f;
-	final float PLAYER_CHECKER_OFFSET = PLAYER_CHECKER_SIZE + 0.1f;
-	final float PLAYER_CHECKER_SIDE_OFFSET = 0.05f;
+	final float PLAYER_CHECKER_SIZE = 0.01f;
+	final float PLAYER_CHECKER_OFFSET = PLAYER_CHECKER_SIZE + 0.01f;
+	final float PLAYER_CHECKER_SIDE_OFFSET = 0.1f;
 	final float PLAYER_JUMP_STRENGTH = 6f;
 	final float PLAYER_MAX_Y = SCREEN_MAX.y - PLAYER_SIZE.y + 0.5f;
 	final float PLAYER_MAX_DIST_TO_CENTER = SCREEN_MAX.x - PLAYER_SIZE.x;
 	final float PLAYER_MAX_DIST_TO_CENTER_SQUARED = PLAYER_MAX_DIST_TO_CENTER * PLAYER_MAX_DIST_TO_CENTER;
 
 	int millisSinceLastJump = 0;
-	final int MILLIS_BETWEEN_JUMPS = 200;
+	final int MILLIS_BETWEEN_JUMPS = 400;
 	int level = 1;
 	List<ShapedObject3> levelObjects;
 	List<RigidBody3> levelObjectBodies;
+	List<Text> levelTexts;
 
 	@Override
 	public void init() {
@@ -115,7 +118,7 @@ public class Game extends StandardGame {
 				ShaderLoader.loadShaderFromFile("res/shaders/cutshader.vert", "res/shaders/cutshader.frag"));
 		cutshader.addArgument("cameraNormal", cam.getDirection());
 		addShader(cutshader);
-		Shader defaultshaderInterface = new Shader(
+		defaultshaderInterface = new Shader(
 				ShaderLoader.loadShaderFromFile("res/shaders/defaultshader.vert", "res/shaders/defaultshader.frag"));
 		addShaderInterface(defaultshaderInterface);
 
@@ -150,7 +153,7 @@ public class Game extends StandardGame {
 				new SimpleManifoldManager<Vector3f>());
 		space.setGlobalGravitation(new Vector3f(0, -8f, 0));
 
-		Font font = FontLoader.loadFont("res/fonts/DejaVuSans.ttf");
+		font = FontLoader.loadFont("res/fonts/DejaVuSans.ttf");
 		debugger = new Debugger(inputs, defaultshader, defaultshaderInterface, font, cam);
 		physicsdebug = new PhysicsDebug(inputs, font, space);
 		GameProfiler gp = new SimpleGameProfiler();
@@ -187,7 +190,8 @@ public class Game extends StandardGame {
 
 		levelObjects = new ArrayList<ShapedObject3>();
 		levelObjectBodies = new ArrayList<RigidBody3>();
-		loadLevel(1);
+		levelTexts = new ArrayList<Text>();
+		loadLevel(5);
 
 		/*
 		 * Box box1 = new Box(4, -4, 4, 1, 0.3f, 1); RigidBody3 rb1 = new
@@ -288,7 +292,7 @@ public class Game extends StandardGame {
 			millisSinceLastJump += delta;
 		}
 		if (jump.isActive() && onGround && millisSinceLastJump >= MILLIS_BETWEEN_JUMPS) {
-			move.y += PLAYER_JUMP_STRENGTH;
+			move.y = PLAYER_JUMP_STRENGTH;
 			millisSinceLastJump = 0;
 		}
 
@@ -355,14 +359,23 @@ public class Game extends StandardGame {
 			space.removeRigidBody(so, rb);
 			so.delete();
 		}
+		for (Text t : levelTexts) {
+			defaultshaderInterface.removeObject(t);
+			t.delete();
+		}
 		levelObjects.clear();
 		levelObjectBodies.clear();
+		levelTexts.clear();
 		cam.rotateTo(0, 0);
 
 		switch (level) {
 		case 1:
 			player.translateTo(5, -5f, 0);
 			goal.translateTo(-5, -5f, 0);
+
+			Text t1 = new Text("You are a square.", 20, 500, font, 24);
+			defaultshaderInterface.addObject(t1);
+			levelTexts.add(t1);
 			break;
 		case 2:
 			player.translateTo(5, -5f, 0);
@@ -374,6 +387,10 @@ public class Game extends StandardGame {
 			cutshader.addObject(box1);
 			levelObjects.add(box1);
 			levelObjectBodies.add(rb1);
+
+			Text t2 = new Text("You have one goal.", 280, 460, font, 24);
+			defaultshaderInterface.addObject(t2);
+			levelTexts.add(t2);
 			break;
 		case 3:
 			player.translateTo(5, -5f, 0);
@@ -385,6 +402,10 @@ public class Game extends StandardGame {
 			cutshader.addObject(c1);
 			levelObjects.add(c1);
 			levelObjectBodies.add(rb2);
+
+			Text t3 = new Text("Being\nwith B.", 700, 500, font, 24);
+			defaultshaderInterface.addObject(t3);
+			levelTexts.add(t3);
 			break;
 		case 4:
 			player.translateTo(5, -5f, 0);
@@ -403,14 +424,89 @@ public class Game extends StandardGame {
 			cutshader.addObject(box3);
 			levelObjects.add(box3);
 			levelObjectBodies.add(rb4);
+
+			Text t4 = new Text("Walls separating you.", 270, 500, font, 24);
+			defaultshaderInterface.addObject(t4);
+			levelTexts.add(t4);
 			break;
 		case 5:
 			player.translateTo(5, -5f, 0);
-			goal.translateTo(-5, -5f, 0);
+			goal.translateTo(-5, 1f, 0);
+
+			Box box4 = new Box(-3.5f, -2.5f, 0, 2.5f, 3f, 6f);
+			RigidBody3 rb5 = new RigidBody3(PhysicsShapeCreator.create(box4));
+			space.addRigidBody(box4, rb5);
+			cutshader.addObject(box4);
+			levelObjects.add(box4);
+			levelObjectBodies.add(rb5);
+
+			Box box5 = new Box(0, -4, 0, 1, 1.5f, 2);
+			RigidBody3 rb6 = new RigidBody3(PhysicsShapeCreator.create(box5));
+			space.addRigidBody(box5, rb6);
+			cutshader.addObject(box5);
+			levelObjects.add(box5);
+			levelObjectBodies.add(rb6);
+
+			Box box6 = new Box(0, -4.75f, 4, 1, 0.75f, 2);
+			RigidBody3 rb7 = new RigidBody3(PhysicsShapeCreator.create(box6));
+			space.addRigidBody(box6, rb7);
+			cutshader.addObject(box6);
+			levelObjects.add(box6);
+			levelObjectBodies.add(rb7);
+
+			Box box7 = new Box(0, -3.25f, -4, 1, 2.25f, 2);
+			RigidBody3 rb8 = new RigidBody3(PhysicsShapeCreator.create(box7));
+			space.addRigidBody(box7, rb8);
+			cutshader.addObject(box7);
+			levelObjects.add(box7);
+			levelObjectBodies.add(rb8);
+
+			Text t5 = new Text("You are different.\n\n                             Inferior.", 465, 260, font, 24);
+			defaultshaderInterface.addObject(t5);
+			levelTexts.add(t5);
 			break;
 		case 6:
 			player.translateTo(5, -5f, 0);
-			goal.translateTo(-5, -5f, 0);
+			goal.translateTo(0, 4f, 0);
+
+			Cylinder cyl1 = new Cylinder(0f, -4.75f, -4f, 1, 0.75f, 36);
+			RigidBody3 rb9 = new RigidBody3(PhysicsShapeCreator.create(cyl1));
+			space.addRigidBody(cyl1, rb9);
+			cutshader.addObject(cyl1);
+			levelObjects.add(cyl1);
+			levelObjectBodies.add(rb9);
+
+			Cylinder cyl2 = new Cylinder(4f, -4f, 0f, 1, 1.5f, 36);
+			RigidBody3 rb10 = new RigidBody3(PhysicsShapeCreator.create(cyl2));
+			space.addRigidBody(cyl2, rb10);
+			cutshader.addObject(cyl2);
+			levelObjects.add(cyl2);
+			levelObjectBodies.add(rb10);
+
+			Cylinder cyl3 = new Cylinder(0f, -3.25f, 4f, 1, 2.25f, 36);
+			RigidBody3 rb11 = new RigidBody3(PhysicsShapeCreator.create(cyl3));
+			space.addRigidBody(cyl3, rb11);
+			cutshader.addObject(cyl3);
+			levelObjects.add(cyl3);
+			levelObjectBodies.add(rb11);
+
+			Cylinder cyl4 = new Cylinder(-4f, -2.75f, -0f, 1, 3f, 36);
+			RigidBody3 rb12 = new RigidBody3(PhysicsShapeCreator.create(cyl4));
+			space.addRigidBody(cyl4, rb12);
+			cutshader.addObject(cyl4);
+			levelObjects.add(cyl4);
+			levelObjectBodies.add(rb12);
+
+			Cylinder cyl5 = new Cylinder(0f, -2.25f, -0f, 1, 3.75f, 36);
+			RigidBody3 rb13 = new RigidBody3(PhysicsShapeCreator.create(cyl5));
+			space.addRigidBody(cyl5, rb13);
+			cutshader.addObject(cyl5);
+			levelObjects.add(cyl5);
+			levelObjectBodies.add(rb13);
+
+			Text t6 = new Text("B is round.         Beautiful.", 240, 90, font, 24);
+			defaultshaderInterface.addObject(t6);
+			levelTexts.add(t6);
 			break;
 		case 7:
 			player.translateTo(5, -5f, 0);
