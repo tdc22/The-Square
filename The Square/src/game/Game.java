@@ -6,6 +6,9 @@ import java.util.List;
 
 import broadphase.SAP;
 import collisionshape.CylinderShape;
+import curves.BezierCurve3;
+import curves.SimpleCurvePath3;
+import curves.SquadCurve3;
 import display.DisplayMode;
 import display.GLDisplay;
 import display.PixelFormat;
@@ -29,6 +32,7 @@ import physics.PhysicsDebug;
 import physics.PhysicsShapeCreator;
 import physics.PhysicsSpace;
 import positionalcorrection.ProjectionCorrection;
+import quaternion.Quaternionf;
 import resolution.SimpleLinearImpulseResolution;
 import shader.Shader;
 import shape.Box;
@@ -78,7 +82,7 @@ public class Game extends StandardGame {
 	final float PLAYER_MOVE_SPEED_Z = 1.5f;
 	final float PLAYER_CHECKER_SIZE = 0.01f;
 	final float PLAYER_CHECKER_OFFSET = PLAYER_CHECKER_SIZE + 0.01f;
-	final float PLAYER_CHECKER_SIDE_OFFSET = 0.1f;
+	final float PLAYER_CHECKER_SIDE_OFFSET = 0.15f;
 	final float PLAYER_JUMP_STRENGTH = 6f;
 	final float PLAYER_MAX_Y = SCREEN_MAX.y - PLAYER_SIZE.y + 0.5f;
 	final float PLAYER_MAX_DIST_TO_CENTER = SCREEN_MAX.x - PLAYER_SIZE.x;
@@ -90,6 +94,10 @@ public class Game extends StandardGame {
 	List<ShapedObject3> levelObjects;
 	List<RigidBody3> levelObjectBodies;
 	List<Text> levelTexts;
+
+	SimpleCurvePath3 cameraCurvePath;
+	SquadCurve3 cameraAngularCurvePath;
+	boolean lastLevel = false;
 
 	@Override
 	public void init() {
@@ -164,6 +172,7 @@ public class Game extends StandardGame {
 
 		player = new Cylinder(0, 0, 0, PLAYER_SIZE.x, PLAYER_SIZE.y, 36);
 		player.setColor(Color.red);
+		player.setRenderHints(true, false, true);
 		playerbody = new RigidBody3(PhysicsShapeCreator.create(player));
 		playerbody.setMass(1f);
 		playerbody.setLinearFactor(new Vector3f(1, 1, 1));
@@ -184,6 +193,7 @@ public class Game extends StandardGame {
 
 		goal = new Sphere(0, 2, 0, 0.5f, 36, 36);
 		goal.setColor(Color.blue);
+		goal.setRenderHints(true, false, true);
 		goalbody = new RigidBody3(PhysicsShapeCreator.create(goal));
 		space.addRigidBody(goal, goalbody);
 		cutshader.addObject(goal);
@@ -191,7 +201,7 @@ public class Game extends StandardGame {
 		levelObjects = new ArrayList<ShapedObject3>();
 		levelObjectBodies = new ArrayList<RigidBody3>();
 		levelTexts = new ArrayList<Text>();
-		loadLevel(5);
+		loadLevel(6);
 
 		/*
 		 * Box box1 = new Box(4, -4, 4, 1, 0.3f, 1); RigidBody3 rb1 = new
@@ -252,6 +262,9 @@ public class Game extends StandardGame {
 		}
 
 		Vector3f frontVec = VecMath.transformVector(cam.getMatrix(), vecRight);
+		if (lastLevel)
+			frontVec.set(0, 0, -1);
+		frontVec.normalize();
 		Vector3f rightVec = VecMath.crossproduct(frontVec, vecUp);
 		Vector3f move = new Vector3f();
 		Vector2f pos = new Vector2f(playerbody.getTranslation().x, playerbody.getTranslation().z);
@@ -292,6 +305,7 @@ public class Game extends StandardGame {
 			millisSinceLastJump += delta;
 		}
 		if (jump.isActive() && onGround && millisSinceLastJump >= MILLIS_BETWEEN_JUMPS) {
+			playerbody.getLinearVelocity().y = 0;
 			move.y = PLAYER_JUMP_STRENGTH;
 			millisSinceLastJump = 0;
 		}
@@ -323,25 +337,34 @@ public class Game extends StandardGame {
 			onGround = true;
 		}
 
-		isPlayerNotInCenter = distToCenterSquared > 0.01f;
-		if (isPlayerNotInCenter) {
-			pos.normalize();
-			if (VecMath.dotproduct(pos, new Vector2f(rightVec.x, rightVec.z)) < 0)
-				pos.negate();
-			float dotX = VecMath.dotproduct(pos, vecX);
-			float angleX = (float) Math.toDegrees(Math.acos(dotX));
-			float angle = 0;
-			if (pos.y < 0)
-				angle = angleX;
-			else
-				angle = 180 + (180 - angleX);
-			cam.rotateTo(angle, 0);
-			intersectionInterface.rotateTo(angle);
+		if (!lastLevel) {
+			isPlayerNotInCenter = distToCenterSquared > 0.01f;
+			if (isPlayerNotInCenter) {
+				pos.normalize();
+				if (VecMath.dotproduct(pos, new Vector2f(rightVec.x, rightVec.z)) < 0)
+					pos.negate();
+				float dotX = VecMath.dotproduct(pos, vecX);
+				float angleX = (float) Math.toDegrees(Math.acos(dotX));
+				float angle = 0;
+				if (pos.y < 0)
+					angle = angleX;
+				else
+					angle = 180 + (180 - angleX);
+				cam.rotateTo(angle, 0);
+				intersectionInterface.rotateTo(angle);
+			}
+			cutshader.setArgument("cameraNormal", cam.getDirection());
+		} else {
+			float t = (5.5f - player.getTranslation().x) / 10f;
+			System.out.println(player.getTranslation().x + "; " + t + "; "
+					+ cameraCurvePath.getPoint((5.5f - player.getTranslation().x) / 10f) + "; "
+					+ cameraCurvePath.getPoint(t) + "; " + cameraAngularCurvePath.getRotation(t));
+			cam.translateTo(cameraCurvePath.getPoint(t));
+			cam.rotateTo(cameraAngularCurvePath.getRotation(t));
 		}
 
 		player.updateBuffer();
 		cam.updateBuffer();
-		cutshader.setArgument("cameraNormal", cam.getDirection());
 
 		if (space.hasCollision(playerbody, goalbody)) {
 			loadLevel(level + 1);
@@ -431,42 +454,6 @@ public class Game extends StandardGame {
 			break;
 		case 5:
 			player.translateTo(5, -5f, 0);
-			goal.translateTo(-5, 1f, 0);
-
-			Box box4 = new Box(-3.5f, -2.5f, 0, 2.5f, 3f, 6f);
-			RigidBody3 rb5 = new RigidBody3(PhysicsShapeCreator.create(box4));
-			space.addRigidBody(box4, rb5);
-			cutshader.addObject(box4);
-			levelObjects.add(box4);
-			levelObjectBodies.add(rb5);
-
-			Box box5 = new Box(0, -4, 0, 1, 1.5f, 2);
-			RigidBody3 rb6 = new RigidBody3(PhysicsShapeCreator.create(box5));
-			space.addRigidBody(box5, rb6);
-			cutshader.addObject(box5);
-			levelObjects.add(box5);
-			levelObjectBodies.add(rb6);
-
-			Box box6 = new Box(0, -4.75f, 4, 1, 0.75f, 2);
-			RigidBody3 rb7 = new RigidBody3(PhysicsShapeCreator.create(box6));
-			space.addRigidBody(box6, rb7);
-			cutshader.addObject(box6);
-			levelObjects.add(box6);
-			levelObjectBodies.add(rb7);
-
-			Box box7 = new Box(0, -3.25f, -4, 1, 2.25f, 2);
-			RigidBody3 rb8 = new RigidBody3(PhysicsShapeCreator.create(box7));
-			space.addRigidBody(box7, rb8);
-			cutshader.addObject(box7);
-			levelObjects.add(box7);
-			levelObjectBodies.add(rb8);
-
-			Text t5 = new Text("You are different.\n\n                             Inferior.", 465, 260, font, 24);
-			defaultshaderInterface.addObject(t5);
-			levelTexts.add(t5);
-			break;
-		case 6:
-			player.translateTo(5, -5f, 0);
 			goal.translateTo(0, 4f, 0);
 
 			Cylinder cyl1 = new Cylinder(0f, -4.75f, -4f, 1, 0.75f, 36);
@@ -508,6 +495,42 @@ public class Game extends StandardGame {
 			defaultshaderInterface.addObject(t6);
 			levelTexts.add(t6);
 			break;
+		case 6:
+			player.translateTo(5, -5f, 0);
+			goal.translateTo(-5, 1f, 0);
+
+			Box box4 = new Box(-3.5f, -2.5f, 0, 2.5f, 3f, 6f);
+			RigidBody3 rb5 = new RigidBody3(PhysicsShapeCreator.create(box4));
+			space.addRigidBody(box4, rb5);
+			cutshader.addObject(box4);
+			levelObjects.add(box4);
+			levelObjectBodies.add(rb5);
+
+			Box box5 = new Box(0, -4, 0, 1, 1.5f, 2);
+			RigidBody3 rb6 = new RigidBody3(PhysicsShapeCreator.create(box5));
+			space.addRigidBody(box5, rb6);
+			cutshader.addObject(box5);
+			levelObjects.add(box5);
+			levelObjectBodies.add(rb6);
+
+			Box box6 = new Box(0, -4.75f, 4, 1, 0.75f, 2);
+			RigidBody3 rb7 = new RigidBody3(PhysicsShapeCreator.create(box6));
+			space.addRigidBody(box6, rb7);
+			cutshader.addObject(box6);
+			levelObjects.add(box6);
+			levelObjectBodies.add(rb7);
+
+			Box box7 = new Box(0, -3.25f, -4, 1, 2.25f, 2);
+			RigidBody3 rb8 = new RigidBody3(PhysicsShapeCreator.create(box7));
+			space.addRigidBody(box7, rb8);
+			cutshader.addObject(box7);
+			levelObjects.add(box7);
+			levelObjectBodies.add(rb8);
+
+			Text t5 = new Text("You are different.\n\n                               Ugly.", 465, 260, font, 24);
+			defaultshaderInterface.addObject(t5);
+			levelTexts.add(t5);
+			break;
 		case 7:
 			player.translateTo(5, -5f, 0);
 			goal.translateTo(-5, -5f, 0);
@@ -515,6 +538,50 @@ public class Game extends StandardGame {
 		case 8:
 			player.translateTo(5, -5f, 0);
 			goal.translateTo(-5, -5f, 0);
+			break;
+		default:
+			player.translateTo(5, -5f, 0);
+			goal.translateTo(-5, -5f, 0);
+
+			cutshader.removeObject(player);
+			cutshader.removeObject(goal);
+			layer3d.getShader().remove(cutshader);
+			cutshader.delete();
+
+			Shader phongshader = new Shader(
+					ShaderLoader.loadShaderFromFile("res/shaders/phongshader.vert", "res/shaders/phongshader.frag"));
+			phongshader.addArgumentName("u_lightpos");
+			phongshader.addArgument(new Vector3f(9, -5, 0));
+			phongshader.addArgumentName("u_ambient");
+			phongshader.addArgument(new Vector3f(0.2f, 0.2f, 0.2f));
+			phongshader.addArgumentName("u_diffuse");
+			phongshader.addArgument(new Vector3f(0.5f, 0.5f, 0.5f));
+			phongshader.addArgumentName("u_shininess");
+			phongshader.addArgument(20f);
+			addShader(phongshader);
+
+			phongshader.addObject(player);
+			phongshader.addObject(goal);
+
+			setDepthTestEnabled(true);
+			Vector3f newCamPos = new Vector3f(0, 0, -10);
+			cameraCurvePath = new SimpleCurvePath3();
+			// cameraCurvePath.addCurve(new BezierCurve3(newCamPos, new
+			// Vector3f(-1, 1, 1), new Vector3f(1, -1, -1), new Vector3f(0, 10,
+			// 0)));
+			cameraCurvePath.addCurve(new BezierCurve3(newCamPos, newCamPos, newCamPos, newCamPos));
+			Quaternionf noRot = new Quaternionf();
+			noRot.rotate(180, new Vector3f(0, 1, 0));
+			Quaternionf fullRot = new Quaternionf();
+			fullRot.rotate(0, new Vector3f(0, 1, 0));
+			// cameraAngularCurvePath = new SquadCurve3(noRot, noRot, fullRot,
+			// fullRot);
+			cameraAngularCurvePath = new SquadCurve3(noRot, noRot, noRot, noRot);
+
+			lastLevel = true;
+			layer3d.setProjectionMatrix(ProjectionHelper.perspective(90, 3 / 4f, 0.1f, 100f));
+			cam.translateTo(newCamPos);
+			cam.rotateTo(180, 0);
 			break;
 		}
 		System.out.println("Loaded level: " + level);
