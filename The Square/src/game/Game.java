@@ -54,6 +54,9 @@ import vector.Vector3f;
 import vector.Vector4f;
 
 public class Game extends StandardGame {
+	// Sorry for the awful code.
+	// Made by tdc inspired by Happie's multidimensional gamedev challenge.
+
 	Debugger debugger;
 	Profiler profiler;
 	PhysicsSpace space;
@@ -80,6 +83,7 @@ public class Game extends StandardGame {
 	final Vector2f PLAYER_SIZE = new Vector2f(0.5f, 0.5f);
 	final float PLAYER_MOVE_SPEED_X = 4f;
 	final float PLAYER_MOVE_SPEED_Z = 1.5f;
+	final float PLAYER_MOVE_SPEED_IN_FINAL_LEVEL = 1.8f;
 	final float PLAYER_CHECKER_SIZE = 0.01f;
 	final float PLAYER_CHECKER_OFFSET = PLAYER_CHECKER_SIZE + 0.01f;
 	final float PLAYER_CHECKER_SIDE_OFFSET = 0.15f;
@@ -87,10 +91,10 @@ public class Game extends StandardGame {
 	final float PLAYER_MAX_Y = SCREEN_MAX.y - PLAYER_SIZE.y + 0.5f;
 	final float PLAYER_MAX_DIST_TO_CENTER = SCREEN_MAX.x - PLAYER_SIZE.x;
 	final float PLAYER_MAX_DIST_TO_CENTER_SQUARED = PLAYER_MAX_DIST_TO_CENTER * PLAYER_MAX_DIST_TO_CENTER;
-
-	int millisSinceLastJump = 0;
 	final int MILLIS_BETWEEN_JUMPS = 400;
-	int level = 1;
+	int millisSinceLastJump = 0;
+
+	int level;
 	List<ShapedObject3> levelObjects;
 	List<RigidBody3> levelObjectBodies;
 	List<Text> levelTexts;
@@ -98,6 +102,7 @@ public class Game extends StandardGame {
 	SimpleCurvePath3 cameraCurvePath;
 	SquadCurve3 cameraAngularCurvePath;
 	boolean lastLevel = false;
+	boolean isRunning = true;
 
 	@Override
 	public void init() {
@@ -201,26 +206,9 @@ public class Game extends StandardGame {
 		levelObjects = new ArrayList<ShapedObject3>();
 		levelObjectBodies = new ArrayList<RigidBody3>();
 		levelTexts = new ArrayList<Text>();
-		loadLevel(6);
-
-		/*
-		 * Box box1 = new Box(4, -4, 4, 1, 0.3f, 1); RigidBody3 rb1 = new
-		 * RigidBody3(PhysicsShapeCreator.create(box1));
-		 * space.addRigidBody(box1, rb1); cutshader.addObject(box1);
-		 * 
-		 * Box box2 = new Box(4, 0, 4, 1, 1f, 1); RigidBody3 rb2 = new
-		 * RigidBody3(PhysicsShapeCreator.create(box2));
-		 * space.addRigidBody(box2, rb2); cutshader.addObject(box2);
-		 * 
-		 * Box box3 = new Box(4, 4, 4, 1, 1f, 1); box3.rotate(45, 45, 0);
-		 * RigidBody3 rb3 = new RigidBody3(PhysicsShapeCreator.create(box3));
-		 * space.addRigidBody(box3, rb3); cutshader.addObject(box3);
-		 */
+		loadLevel(7);
 
 		onGround = false;
-
-		// cutshader.addObject(new Sphere(0, 2, 0, 1, 36, 36));
-		// cutshader.addObject(new Box(0, 4, 0, 1, 1, 1));
 
 		interfaceOverlay.addObject(new Circle(55, 55, 50, 36));
 		intersectionInterface = new Quad(55, 55, 55, 1);
@@ -248,126 +236,143 @@ public class Game extends StandardGame {
 	public void update(int delta) {
 		debugger.update(fps, 0, 0);
 
-		if (inputs.isKeyDown("I")) {
-			cam.rotate(delta * 0.1f, 0);
-		}
-		if (inputs.isKeyDown("K")) {
-			cam.rotate(-delta * 0.1f, 0);
-		}
-		if (inputs.isKeyDown("J")) {
-			cam.getTranslation().z -= delta * 0.01f;
-		}
-		if (inputs.isKeyDown("L")) {
-			cam.getTranslation().z += delta * 0.01f;
-		}
+		if (isRunning) {
+			Vector3f frontVec = VecMath.transformVector(cam.getMatrix(), vecRight);
+			if (lastLevel)
+				frontVec.set(0, 0, -1);
+			frontVec.normalize();
+			Vector3f rightVec = VecMath.crossproduct(frontVec, vecUp);
+			Vector3f move = new Vector3f();
+			Vector2f pos = new Vector2f(playerbody.getTranslation().x, playerbody.getTranslation().z);
+			boolean isPlayerNotInCenter = pos.lengthSquared() > 0.01f;
 
-		Vector3f frontVec = VecMath.transformVector(cam.getMatrix(), vecRight);
-		if (lastLevel)
-			frontVec.set(0, 0, -1);
-		frontVec.normalize();
-		Vector3f rightVec = VecMath.crossproduct(frontVec, vecUp);
-		Vector3f move = new Vector3f();
-		Vector2f pos = new Vector2f(playerbody.getTranslation().x, playerbody.getTranslation().z);
-		boolean isPlayerNotInCenter = pos.lengthSquared() > 0.01f;
-
-		if (isPlayerNotInCenter) {
-			float distToMid = (float) pos.length();
-			if (up.isActive()) {
-				move.x += frontVec.x * distToMid * PLAYER_MOVE_SPEED_Z;
-				move.z += frontVec.z * distToMid * PLAYER_MOVE_SPEED_Z;
+			if (!lastLevel) {
+				if (isPlayerNotInCenter) {
+					float distToMid = (float) pos.length();
+					if (up.isActive()) {
+						move.x += frontVec.x * distToMid * PLAYER_MOVE_SPEED_Z;
+						move.z += frontVec.z * distToMid * PLAYER_MOVE_SPEED_Z;
+					}
+					if (down.isActive()) {
+						move.x -= frontVec.x * distToMid * PLAYER_MOVE_SPEED_Z;
+						move.z -= frontVec.z * distToMid * PLAYER_MOVE_SPEED_Z;
+					}
+					if (up.isActive() || down.isActive()) {
+						float movespeed = (float) new Vector2f(move.x, move.z).length();
+						Vector2f predictedPos = VecMath.addition(pos,
+								new Vector2f(move.x * delta / 1000f, move.z * delta / 1000f));
+						predictedPos.normalize();
+						predictedPos.scale(distToMid);
+						move.x = predictedPos.x - pos.x;
+						move.z = predictedPos.y - pos.y;
+						if (move.lengthSquared() > 0)
+							move.setLength(movespeed);
+					}
+				}
+				if (left.isActive()) {
+					move.x += rightVec.x * PLAYER_MOVE_SPEED_X;
+					move.z += rightVec.z * PLAYER_MOVE_SPEED_X;
+				}
+				if (right.isActive()) {
+					move.x -= rightVec.x * PLAYER_MOVE_SPEED_X;
+					move.z -= rightVec.z * PLAYER_MOVE_SPEED_X;
+				}
+			} else {
+				if (up.isActive()) {
+					move.x -= frontVec.x;
+					move.z -= frontVec.z;
+				}
+				if (down.isActive()) {
+					move.x += frontVec.x;
+					move.z += frontVec.z;
+				}
+				if (left.isActive()) {
+					move.x += rightVec.x;
+					move.z += rightVec.z;
+				}
+				if (right.isActive()) {
+					move.x -= rightVec.x;
+					move.z -= rightVec.z;
+				}
+				move.scale(PLAYER_MOVE_SPEED_IN_FINAL_LEVEL);
 			}
-			if (down.isActive()) {
-				move.x -= frontVec.x * distToMid * PLAYER_MOVE_SPEED_Z;
-				move.z -= frontVec.z * distToMid * PLAYER_MOVE_SPEED_Z;
+
+			if (millisSinceLastJump < MILLIS_BETWEEN_JUMPS) {
+				millisSinceLastJump += delta;
 			}
-			if (up.isActive() || down.isActive()) {
-				float movespeed = (float) new Vector2f(move.x, move.z).length();
-				Vector2f predictedPos = VecMath.addition(pos,
-						new Vector2f(move.x * delta / 1000f, move.z * delta / 1000f));
-				predictedPos.normalize();
-				predictedPos.scale(distToMid);
-				move.x = predictedPos.x - pos.x;
-				move.z = predictedPos.y - pos.y;
-				if (move.lengthSquared() > 0)
-					move.setLength(movespeed);
+			if (jump.isActive() && onGround && millisSinceLastJump >= MILLIS_BETWEEN_JUMPS) {
+				playerbody.getLinearVelocity().y = 0;
+				move.y = PLAYER_JUMP_STRENGTH;
+				millisSinceLastJump = 0;
 			}
-		}
 
-		if (left.isActive()) {
-			move.x += rightVec.x * PLAYER_MOVE_SPEED_X;
-			move.z += rightVec.z * PLAYER_MOVE_SPEED_X;
-		}
-		if (right.isActive()) {
-			move.x -= rightVec.x * PLAYER_MOVE_SPEED_X;
-			move.z -= rightVec.z * PLAYER_MOVE_SPEED_X;
-		}
-		if (millisSinceLastJump < MILLIS_BETWEEN_JUMPS) {
-			millisSinceLastJump += delta;
-		}
-		if (jump.isActive() && onGround && millisSinceLastJump >= MILLIS_BETWEEN_JUMPS) {
-			playerbody.getLinearVelocity().y = 0;
-			move.y = PLAYER_JUMP_STRENGTH;
-			millisSinceLastJump = 0;
-		}
+			playerbody.setLinearVelocity(new Vector3f(move.x, playerbody.getLinearVelocity().y + move.y, move.z));
 
-		playerbody.setLinearVelocity(new Vector3f(move.x, playerbody.getLinearVelocity().y + move.y, move.z));
+			playerJumpChecker.setTranslation(new Vector3f(playerbody.getTranslation().x,
+					playerbody.getTranslation().y - PLAYER_SIZE.y - PLAYER_CHECKER_OFFSET,
+					playerbody.getTranslation().z));
 
-		playerJumpChecker.setTranslation(new Vector3f(playerbody.getTranslation().x,
-				playerbody.getTranslation().y - PLAYER_SIZE.y - PLAYER_CHECKER_OFFSET, playerbody.getTranslation().z));
+			space.update(delta);
 
-		space.update(delta);
+			onGround = space.hasCollision(playerJumpChecker);
 
-		onGround = space.hasCollision(playerJumpChecker);
-
-		// update pos after physics update
-		pos = new Vector2f(player.getTranslation().x, player.getTranslation().z);
-		float distToCenterSquared = (float) pos.lengthSquared();
-		if (distToCenterSquared > PLAYER_MAX_DIST_TO_CENTER_SQUARED) {
-			pos.setLength(PLAYER_MAX_DIST_TO_CENTER);
-			player.getTranslation().x = pos.x;
-			player.getTranslation().z = pos.y;
-		}
-		if (player.getTranslation().y > PLAYER_MAX_Y) {
-			player.getTranslation().y = PLAYER_MAX_Y;
-			playerbody.getLinearVelocity().y = 0;
-		}
-		if (player.getTranslation().y < -PLAYER_MAX_Y) {
-			player.getTranslation().y = -PLAYER_MAX_Y;
-			playerbody.getLinearVelocity().y = 0;
-			onGround = true;
-		}
-
-		if (!lastLevel) {
-			isPlayerNotInCenter = distToCenterSquared > 0.01f;
-			if (isPlayerNotInCenter) {
-				pos.normalize();
-				if (VecMath.dotproduct(pos, new Vector2f(rightVec.x, rightVec.z)) < 0)
-					pos.negate();
-				float dotX = VecMath.dotproduct(pos, vecX);
-				float angleX = (float) Math.toDegrees(Math.acos(dotX));
-				float angle = 0;
-				if (pos.y < 0)
-					angle = angleX;
-				else
-					angle = 180 + (180 - angleX);
-				cam.rotateTo(angle, 0);
-				intersectionInterface.rotateTo(angle);
+			// update pos after physics update
+			pos = new Vector2f(player.getTranslation().x, player.getTranslation().z);
+			float distToCenterSquared = (float) pos.lengthSquared();
+			if (distToCenterSquared > PLAYER_MAX_DIST_TO_CENTER_SQUARED) {
+				pos.setLength(PLAYER_MAX_DIST_TO_CENTER);
+				player.getTranslation().x = pos.x;
+				player.getTranslation().z = pos.y;
 			}
-			cutshader.setArgument("cameraNormal", cam.getDirection());
-		} else {
-			float t = (5.5f - player.getTranslation().x) / 10f;
-			System.out.println(player.getTranslation().x + "; " + t + "; "
-					+ cameraCurvePath.getPoint((5.5f - player.getTranslation().x) / 10f) + "; "
-					+ cameraCurvePath.getPoint(t) + "; " + cameraAngularCurvePath.getRotation(t));
-			cam.translateTo(cameraCurvePath.getPoint(t));
-			cam.rotateTo(cameraAngularCurvePath.getRotation(t));
-		}
+			if (player.getTranslation().y > PLAYER_MAX_Y) {
+				player.getTranslation().y = PLAYER_MAX_Y;
+				playerbody.getLinearVelocity().y = 0;
+			}
+			if (player.getTranslation().y < -PLAYER_MAX_Y) {
+				player.getTranslation().y = -PLAYER_MAX_Y;
+				playerbody.getLinearVelocity().y = 0;
+				onGround = true;
+			}
 
-		player.updateBuffer();
-		cam.updateBuffer();
+			if (!lastLevel) {
+				isPlayerNotInCenter = distToCenterSquared > 0.01f;
+				if (isPlayerNotInCenter) {
+					pos.normalize();
+					if (VecMath.dotproduct(pos, new Vector2f(rightVec.x, rightVec.z)) < 0)
+						pos.negate();
+					float dotX = VecMath.dotproduct(pos, vecX);
+					float angleX = (float) Math.toDegrees(Math.acos(dotX));
+					float angle = 0;
+					if (pos.y < 0)
+						angle = angleX;
+					else
+						angle = 180 + (180 - angleX);
+					cam.rotateTo(angle, 0);
+					intersectionInterface.rotateTo(angle);
+				}
+				cutshader.setArgument("cameraNormal", cam.getDirection());
+			} else {
+				float t = (5.5f - player.getTranslation().x) / 10f;
+				cam.translateTo(cameraCurvePath.getPoint(t));
+				cam.rotateTo(cameraAngularCurvePath.getRotation(t));
+			}
 
-		if (space.hasCollision(playerbody, goalbody)) {
-			loadLevel(level + 1);
+			player.updateBuffer();
+			cam.updateBuffer();
+
+			if (space.hasCollision(playerbody, goalbody)) {
+				if (!lastLevel) {
+					loadLevel(level + 1);
+				} else {
+					isRunning = false;
+
+					Text tend = new Text("THE END", 280, 260, font, 64);
+					defaultshaderInterface.addObject(tend);
+
+					Text tesc = new Text("Press Escape to quit.", 290, 400, font, 24);
+					defaultshaderInterface.addObject(tesc);
+				}
+			}
 		}
 	}
 
@@ -533,7 +538,63 @@ public class Game extends StandardGame {
 			break;
 		case 7:
 			player.translateTo(5, -5f, 0);
-			goal.translateTo(-5, -5f, 0);
+			goal.translateTo(0, 5f, 0);
+
+			Cylinder cyl6 = new Cylinder(0f, -2.2f, 0f, 4, 2, 36);
+			RigidBody3 rb14 = new RigidBody3(PhysicsShapeCreator.create(cyl6));
+			space.addRigidBody(cyl6, rb14);
+			cutshader.addObject(cyl6);
+			levelObjects.add(cyl6);
+			levelObjectBodies.add(rb14);
+
+			Box box8 = new Box(3, -4, 0, 3, 0.2f, 3);
+			RigidBody3 rb15 = new RigidBody3(PhysicsShapeCreator.create(box8));
+			space.addRigidBody(box8, rb15);
+			cutshader.addObject(box8);
+			levelObjects.add(box8);
+			levelObjectBodies.add(rb15);
+
+			Box box9 = new Box(0, -2f, 3, 3, 0.2f, 3);
+			RigidBody3 rb16 = new RigidBody3(PhysicsShapeCreator.create(box9));
+			space.addRigidBody(box9, rb16);
+			cutshader.addObject(box9);
+			levelObjects.add(box9);
+			levelObjectBodies.add(rb16);
+
+			Box box10 = new Box(0, -0.41f, 3, 3, 0.2f, 3);
+			RigidBody3 rb17 = new RigidBody3(PhysicsShapeCreator.create(box10));
+			space.addRigidBody(box10, rb17);
+			cutshader.addObject(box10);
+			levelObjects.add(box10);
+			levelObjectBodies.add(rb17);
+
+			Box box11 = new Box(-3, -2f, 0, 3, 0.2f, 3);
+			RigidBody3 rb18 = new RigidBody3(PhysicsShapeCreator.create(box11));
+			space.addRigidBody(box11, rb18);
+			cutshader.addObject(box11);
+			levelObjects.add(box11);
+			levelObjectBodies.add(rb18);
+
+			Box box12 = new Box(0, 1.4f, 0, 6, 0.2f, 2);
+			RigidBody3 rb19 = new RigidBody3(PhysicsShapeCreator.create(box12));
+			space.addRigidBody(box12, rb19);
+			cutshader.addObject(box12);
+			levelObjects.add(box12);
+			levelObjectBodies.add(rb19);
+
+			Box box13 = new Box(0, 3.8f, 1.8f, 6, 2.2f, 0.2f);
+			RigidBody3 rb20 = new RigidBody3(PhysicsShapeCreator.create(box13));
+			space.addRigidBody(box13, rb20);
+			cutshader.addObject(box13);
+			levelObjects.add(box13);
+			levelObjectBodies.add(rb20);
+
+			Box box14 = new Box(0, 3.8f, -1.8f, 1, 2.2f, 0.2f);
+			RigidBody3 rb21 = new RigidBody3(PhysicsShapeCreator.create(box14));
+			space.addRigidBody(box14, rb21);
+			cutshader.addObject(box14);
+			levelObjects.add(box14);
+			levelObjectBodies.add(rb21);
 			break;
 		case 8:
 			player.translateTo(5, -5f, 0);
@@ -564,19 +625,16 @@ public class Game extends StandardGame {
 			phongshader.addObject(goal);
 
 			setDepthTestEnabled(true);
-			Vector3f newCamPos = new Vector3f(0, 0, -10);
+			Vector3f newCamPos = new Vector3f(0, -5, -10);
 			cameraCurvePath = new SimpleCurvePath3();
-			// cameraCurvePath.addCurve(new BezierCurve3(newCamPos, new
-			// Vector3f(-1, 1, 1), new Vector3f(1, -1, -1), new Vector3f(0, 10,
-			// 0)));
-			cameraCurvePath.addCurve(new BezierCurve3(newCamPos, newCamPos, newCamPos, newCamPos));
+			cameraCurvePath
+					.addCurve(new BezierCurve3(newCamPos, newCamPos, new Vector3f(0, 10, 0), new Vector3f(0, 10, 0)));
 			Quaternionf noRot = new Quaternionf();
 			noRot.rotate(180, new Vector3f(0, 1, 0));
 			Quaternionf fullRot = new Quaternionf();
-			fullRot.rotate(0, new Vector3f(0, 1, 0));
-			// cameraAngularCurvePath = new SquadCurve3(noRot, noRot, fullRot,
-			// fullRot);
-			cameraAngularCurvePath = new SquadCurve3(noRot, noRot, noRot, noRot);
+			fullRot.rotate(180, new Vector3f(0, 1, 0));
+			fullRot.rotate(-90, new Vector3f(1, 0, 0));
+			cameraAngularCurvePath = new SquadCurve3(noRot, fullRot, noRot, fullRot);
 
 			lastLevel = true;
 			layer3d.setProjectionMatrix(ProjectionHelper.perspective(90, 3 / 4f, 0.1f, 100f));
