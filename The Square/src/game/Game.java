@@ -103,6 +103,7 @@ public class Game extends StandardGame {
 	SquadCurve3 cameraAngularCurvePath;
 	boolean lastLevel = false;
 	boolean isRunning = true;
+	boolean lockedDepth;
 
 	@Override
 	public void init() {
@@ -206,7 +207,7 @@ public class Game extends StandardGame {
 		levelObjects = new ArrayList<ShapedObject3>();
 		levelObjectBodies = new ArrayList<RigidBody3>();
 		levelTexts = new ArrayList<Text>();
-		loadLevel(7);
+		loadLevel(8);
 
 		onGround = false;
 
@@ -247,13 +248,15 @@ public class Game extends StandardGame {
 			boolean isPlayerNotInCenter = pos.lengthSquared() > 0.01f;
 
 			if (!lastLevel) {
+				if (!up.isActive() && !down.isActive())
+					lockedDepth = false;
 				if (isPlayerNotInCenter) {
 					float distToMid = (float) pos.length();
-					if (up.isActive()) {
+					if (up.isActive() && !lockedDepth) {
 						move.x += frontVec.x * distToMid * PLAYER_MOVE_SPEED_Z;
 						move.z += frontVec.z * distToMid * PLAYER_MOVE_SPEED_Z;
 					}
-					if (down.isActive()) {
+					if (down.isActive() && !lockedDepth) {
 						move.x -= frontVec.x * distToMid * PLAYER_MOVE_SPEED_Z;
 						move.z -= frontVec.z * distToMid * PLAYER_MOVE_SPEED_Z;
 					}
@@ -378,6 +381,7 @@ public class Game extends StandardGame {
 
 	public void loadLevel(int level) {
 		this.level = level;
+		lockedDepth = true;
 
 		// clear previous level
 		for (int i = 0; i < levelObjects.size(); i++) {
@@ -532,7 +536,7 @@ public class Game extends StandardGame {
 			levelObjects.add(box7);
 			levelObjectBodies.add(rb8);
 
-			Text t5 = new Text("You are different.\n\n                               Ugly.", 465, 260, font, 24);
+			Text t5 = new Text("You are different.\n\n                             Useless.", 465, 260, font, 24);
 			defaultshaderInterface.addObject(t5);
 			levelTexts.add(t5);
 			break;
@@ -595,10 +599,60 @@ public class Game extends StandardGame {
 			cutshader.addObject(box14);
 			levelObjects.add(box14);
 			levelObjectBodies.add(rb21);
+
+			Text t7 = new Text("4 Corners. 4 Edges. Ugly.", 240, 575, font, 24);
+			defaultshaderInterface.addObject(t7);
+			levelTexts.add(t7);
 			break;
 		case 8:
 			player.translateTo(5, -5f, 0);
-			goal.translateTo(-5, -5f, 0);
+			goal.translateTo(0, -5f, 5);
+
+			Cylinder cyl7 = new Cylinder(-4f, -4f, -0f, 1, 1.5f, 36);
+			RigidBody3 rb22 = new RigidBody3(PhysicsShapeCreator.create(cyl7));
+			space.addRigidBody(cyl7, rb22);
+			cutshader.addObject(cyl7);
+			levelObjects.add(cyl7);
+			levelObjectBodies.add(rb22);
+
+			Cylinder cyl8 = new Cylinder(-4f, -4.75f, -0f, 2f, 0.75f, 36);
+			RigidBody3 rb23 = new RigidBody3(PhysicsShapeCreator.create(cyl8));
+			space.addRigidBody(cyl8, rb23);
+			cutshader.addObject(cyl8);
+			levelObjects.add(cyl8);
+			levelObjectBodies.add(rb23);
+
+			Cylinder cyl9 = new Cylinder(0f, -3.25f, -4f, 1, 2.25f, 36);
+			RigidBody3 rb24 = new RigidBody3(PhysicsShapeCreator.create(cyl9));
+			space.addRigidBody(cyl9, rb24);
+			cutshader.addObject(cyl9);
+			levelObjects.add(cyl9);
+			levelObjectBodies.add(rb24);
+
+			Cylinder cyl10 = new Cylinder(0f, -1f, -0f, 1, 1.5f, 36);
+			RigidBody3 rb25 = new RigidBody3(PhysicsShapeCreator.create(cyl10));
+			space.addRigidBody(cyl10, rb25);
+			cutshader.addObject(cyl10);
+			levelObjects.add(cyl10);
+			levelObjectBodies.add(rb25);
+
+			Box box15 = new Box(0, -1, 3.8f, 6, 5, 0.2f);
+			RigidBody3 rb26 = new RigidBody3(PhysicsShapeCreator.create(box15));
+			space.addRigidBody(box15, rb26);
+			cutshader.addObject(box15);
+			levelObjects.add(box15);
+			levelObjectBodies.add(rb26);
+
+			Cylinder cyl11 = new Cylinder(4f, 0.75f, -0f, 1, 1.5f, 36);
+			RigidBody3 rb27 = new RigidBody3(PhysicsShapeCreator.create(cyl11));
+			space.addRigidBody(cyl11, rb27);
+			cutshader.addObject(cyl11);
+			levelObjects.add(cyl11);
+			levelObjectBodies.add(rb27);
+
+			Text t8 = new Text("Time passes.\nAnd finally you realise...", 260, 180, font, 24);
+			defaultshaderInterface.addObject(t8);
+			levelTexts.add(t8);
 			break;
 		default:
 			player.translateTo(5, -5f, 0);
