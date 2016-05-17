@@ -72,7 +72,7 @@ public class Game extends StandardGame {
 	final Vector2f vecX = new Vector2f(1, 0);
 	Quad intersectionInterface;
 	Font font;
-	Shader cutshader, defaultshaderInterface;
+	Shader cutshader, defaultshaderInterface, finalTextInterface;
 
 	Sphere goal;
 	RigidBody3 goalbody;
@@ -93,6 +93,7 @@ public class Game extends StandardGame {
 	final float PLAYER_MAX_DIST_TO_CENTER_SQUARED = PLAYER_MAX_DIST_TO_CENTER * PLAYER_MAX_DIST_TO_CENTER;
 	final int MILLIS_BETWEEN_JUMPS = 400;
 	int millisSinceLastJump = 0;
+	float lastLevelPositionXExtension, lastLevelPositionXMax;
 
 	int level;
 	List<ShapedObject3> levelObjects;
@@ -207,7 +208,8 @@ public class Game extends StandardGame {
 		levelObjects = new ArrayList<ShapedObject3>();
 		levelObjectBodies = new ArrayList<RigidBody3>();
 		levelTexts = new ArrayList<Text>();
-		loadLevel(8);
+		loadLevel(1); // If you instantly load the last level, depth test is
+						// disabled and the level might look buggy.
 
 		onGround = false;
 
@@ -355,9 +357,14 @@ public class Game extends StandardGame {
 				}
 				cutshader.setArgument("cameraNormal", cam.getDirection());
 			} else {
-				float t = (5.5f - player.getTranslation().x) / 10f;
+				float t = getRelativePosition(player.getTranslation().x);
 				cam.translateTo(cameraCurvePath.getPoint(t));
 				cam.rotateTo(cameraAngularCurvePath.getRotation(t));
+				finalTextInterface.setArgument("u_positionX", t);
+				if (player.getTranslation().x < lastLevelPositionXMax) {
+					lastLevelPositionXMax = player.getTranslation().x;
+					finalTextInterface.setArgument("u_maxPositionX", getRelativePosition(lastLevelPositionXMax));
+				}
 			}
 
 			player.updateBuffer();
@@ -372,11 +379,26 @@ public class Game extends StandardGame {
 					Text tend = new Text("THE END", 280, 260, font, 64);
 					defaultshaderInterface.addObject(tend);
 
-					Text tesc = new Text("Press Escape to quit.", 290, 400, font, 24);
+					Text ttdc = new Text("Made by tdc. (@tdc_22)", 275, 400, font, 24);
+					defaultshaderInterface.addObject(ttdc);
+
+					Text tesc = new Text("Press Escape to quit.", 290, 460, font, 24);
 					defaultshaderInterface.addObject(tesc);
+
+					lastLevelPositionXExtension = player.getTranslation().x;
+					lastLevelPositionXMax = player.getTranslation().x;
 				}
 			}
+		} else {
+			if (lastLevelPositionXExtension > -10) {
+				lastLevelPositionXExtension -= PLAYER_MOVE_SPEED_IN_FINAL_LEVEL * delta / 1000f;
+				finalTextInterface.setArgument("u_positionX", getRelativePosition(lastLevelPositionXExtension));
+			}
 		}
+	}
+
+	private float getRelativePosition(float transX) {
+		return (5.5f - transX) / 10f;
 	}
 
 	public void loadLevel(int level) {
@@ -694,6 +716,17 @@ public class Game extends StandardGame {
 			layer3d.setProjectionMatrix(ProjectionHelper.perspective(90, 3 / 4f, 0.1f, 100f));
 			cam.translateTo(newCamPos);
 			cam.rotateTo(180, 0);
+
+			finalTextInterface = new Shader(ShaderLoader.loadShaderFromFile("res/shaders/finaltextshader.vert",
+					"res/shaders/finaltextshader.frag"));
+			finalTextInterface.addArgument("u_positionX", 10.0f);
+			finalTextInterface.addArgument("u_maxPositionX", 10.0f);
+			addShaderInterface(finalTextInterface);
+			lastLevelPositionXMax = 10;
+
+			Text t9 = new Text("that it's just a matter of perspective.", 180, 180, font, 24);
+			finalTextInterface.addObject(t9);
+			levelTexts.add(t9);
 			break;
 		}
 		System.out.println("Loaded level: " + level);
