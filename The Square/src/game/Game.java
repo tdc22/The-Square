@@ -469,7 +469,7 @@ public class Game extends StandardGame {
 			addCylinder(-4f, -2.75f, -0f, 1, 3f);
 			addCylinder(0f, -2.25f, -0f, 1, 3.75f);
 
-			addLevelText("B is round.         Beautiful.", 240, 90);
+			addLevelText("B is round.         Perfect.", 240, 90);
 			break;
 		case 6:
 			player.translateTo(5, -5f, 0);
