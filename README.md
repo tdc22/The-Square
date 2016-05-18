@@ -1,11 +1,11 @@
-# The-Square
+# The Square
 "The Square" is a puzzle-platformer I created in less than 2 weeks using my game (rendering and physics) engine [JAwesomeEngine](https://github.com/tdc22/JAwesomeEngine) for and inspired by [Happie's Multidimensionality Challenge](https://www.reddit.com/r/TheHappieMakers/comments/4gb7f7/game_dev_challenge_multidimensionality/).
 
 ## Play Now
 Requirements:
 * Java 8 or higher
 * at least OpenGL 3.3
-* Windows or Linux (Mac or other platforms are untestet but could work)
+* Windows or Linux (Mac or other platforms are untested but could work)
 
 Just download the [TheSquare.zip](https://github.com/tdc22/The-Square/blob/master/TheSquare.zip?raw=true), extract it and run the file "TheSquare.jar" either directly or via command line using:  
 ```java -jar TheSquare.jar```
