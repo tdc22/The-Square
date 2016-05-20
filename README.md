@@ -14,7 +14,7 @@ If you have a question or run into a problem, feel free to message me.
 
 ## Controls
 * WASD: movement
-* Keyboard: jump
+* Space: jump
 * Escape: close game
 
 ## Source
