@@ -28,7 +28,6 @@ import narrowphase.GJK;
 import objects.GhostObject3;
 import objects.RigidBody3;
 import objects.ShapedObject3;
-import physics.PhysicsDebug;
 import physics.PhysicsShapeCreator;
 import physics.PhysicsSpace;
 import positionalcorrection.ProjectionCorrection;
@@ -41,14 +40,9 @@ import shape.Sphere;
 import shape2d.Circle;
 import shape2d.Quad;
 import sound.NullSoundEnvironment;
-import space.PhysicsProfiler;
-import space.SimplePhysicsProfiler;
 import utils.Debugger;
 import utils.DefaultValues;
-import utils.GameProfiler;
-import utils.Profiler;
 import utils.ProjectionHelper;
-import utils.SimpleGameProfiler;
 import vector.Vector2f;
 import vector.Vector3f;
 import vector.Vector4f;
@@ -59,9 +53,7 @@ public class Game extends StandardGame {
 	// challenge.
 
 	Debugger debugger;
-	Profiler profiler;
 	PhysicsSpace space;
-	PhysicsDebug physicsdebug;
 
 	Cylinder player;
 	RigidBody3 playerbody;
@@ -170,12 +162,6 @@ public class Game extends StandardGame {
 
 		font = FontLoader.loadFont("res/fonts/DejaVuSans.ttf");
 		debugger = new Debugger(inputs, defaultshader, defaultshaderInterface, font, cam);
-		physicsdebug = new PhysicsDebug(inputs, font, space);
-		GameProfiler gp = new SimpleGameProfiler();
-		setProfiler(gp);
-		PhysicsProfiler pp = new SimplePhysicsProfiler();
-		space.setProfiler(pp);
-		profiler = new Profiler(this, inputs, font, gp, pp);
 
 		player = new Cylinder(0, 0, 0, PLAYER_SIZE.x, PLAYER_SIZE.y, 36);
 		player.setColor(Color.red);
