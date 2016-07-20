@@ -110,8 +110,7 @@ public class Game extends StandardGame {
 				new NullSoundEnvironment());
 		layer3d.setProjectionMatrix(
 				ProjectionHelper.ortho(SCREEN_MAX.x, SCREEN_MIN.x, SCREEN_MIN.y, SCREEN_MAX.y, -10, 10));
-
-		display.bindMouse();
+		
 		cam.setFlyCam(false);
 		cam.translateTo(0f, 0f, 0);
 		cam.rotateTo(0, 0);
