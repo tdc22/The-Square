@@ -25,6 +25,7 @@ import manifold.SimpleManifoldManager;
 import math.VecMath;
 import narrowphase.EPA;
 import narrowphase.GJK;
+import narrowphase.SupportRaycast;
 import objects.GhostObject3;
 import objects.RigidBody3;
 import objects.ShapedObject3;
@@ -154,7 +155,7 @@ public class Game extends StandardGame {
 		inputs.addEvent(right);
 		inputs.addEvent(jump);
 
-		space = new PhysicsSpace(new VerletIntegration(), new SAP(), new GJK(new EPA()),
+		space = new PhysicsSpace(new VerletIntegration(), new SAP(), new GJK(new EPA()), new SupportRaycast(),
 				new SimpleLinearImpulseResolution(), new ProjectionCorrection(0.01f),
 				new SimpleManifoldManager<Vector3f>());
 		space.setGlobalGravitation(new Vector3f(0, -8f, 0));
