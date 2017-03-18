@@ -1,6 +1,5 @@
 package game;
 
-import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,6 +12,7 @@ import display.DisplayMode;
 import display.GLDisplay;
 import display.PixelFormat;
 import display.VideoSettings;
+import gui.Color;
 import gui.Font;
 import gui.Text;
 import input.Input;
@@ -164,7 +164,7 @@ public class Game extends StandardGame {
 		debugger = new Debugger(inputs, defaultshader, defaultshaderInterface, font, cam);
 
 		player = new Cylinder(0, 0, 0, PLAYER_SIZE.x, PLAYER_SIZE.y, 36);
-		player.setColor(Color.red);
+		player.setColor(Color.RED);
 		player.setRenderHints(true, false, true);
 		playerbody = new RigidBody3(PhysicsShapeCreator.create(player));
 		playerbody.setMass(1f);
@@ -185,7 +185,7 @@ public class Game extends StandardGame {
 		space.addGhostObject(playerJumpChecker);
 
 		goal = new Sphere(0, 2, 0, 0.5f, 36, 36);
-		goal.setColor(Color.blue);
+		goal.setColor(Color.BLUE);
 		goal.setRenderHints(true, false, true);
 		goalbody = new RigidBody3(PhysicsShapeCreator.create(goal));
 		space.addRigidBody(goal, goalbody);
