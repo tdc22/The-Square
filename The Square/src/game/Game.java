@@ -21,7 +21,7 @@ import input.KeyInput;
 import integration.VerletIntegration;
 import loader.FontLoader;
 import loader.ShaderLoader;
-import manifold.SimpleManifoldManager;
+import manifold.SimpleManifoldManager3;
 import math.VecMath;
 import narrowphase.EPA;
 import narrowphase.GJK;
@@ -157,7 +157,7 @@ public class Game extends StandardGame {
 
 		space = new PhysicsSpace(new VerletIntegration(), new SAP(), new GJK(new EPA()), new SupportRaycast(),
 				new SimpleLinearImpulseResolution(), new ProjectionCorrection(0.01f),
-				new SimpleManifoldManager<Vector3f>());
+				new SimpleManifoldManager3());
 		space.setGlobalGravitation(new Vector3f(0, -8f, 0));
 
 		font = FontLoader.loadFont("res/fonts/DejaVuSans.ttf");
